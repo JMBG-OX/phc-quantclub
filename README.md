@@ -1,4 +1,7 @@
-# PHC QUANT CLUB 17/04/25
-Download and run this R code if you would like to follow along during the live session.
+# PHC QUANT CLUB
 
-To download the code, simply click on the quantclub.R file and then click the "download raw file" button on the right side of the screen.
+We aim to organise Quant Club sessions monthly. The purpose of this repository is to store slides, and sometimes code, used in Quant Club presentations, as well as providing a timetable for upcoming sessions.
+
+| Session | Presenter | Date
+| :---         | :---           | :--- |
+| Using AI with R | Iryna Schlackow | 2026-10-06 |
