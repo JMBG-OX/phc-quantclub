@@ -1,4 +1,8 @@
-# PHC QUANT CLUB 17/04/25
-Download and run this R code if you would like to follow along during the live session.
+# PHC QUANT CLUB
 
-To download the code, simply click on the quantclub.R file and then click the "download raw file" button on the right side of the screen.
+We aim to organise Quant Club talks monthly. Each talk will be followed by a thematically related R practical session, so that talks and practicals alternate approximately every two weeks. The purpose of this repository is to store slides and code used in Quant Club presentations and practicals, as well as providing a timetable for upcoming sessions.
+
+| Session | Presenter | Date | Materials
+| :---         | :---           | :--- | :---
+| Using AI to help with writing code and consolidating good habits | Iryna Schlackow | 2026-10-06 | TBC
+| Practical: AI-assisted data cleaning | Ru Jia | 2026-10-?? | TBC
