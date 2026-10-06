@@ -4,5 +4,5 @@ We aim to organise Quant Club talks monthly. Each talk will be followed by a the
 
 | Session | Presenter | Date | Materials
 | :---         | :---           | :--- | :---
-| Using AI to help with writing code and consolidating good habits | Iryna Schlackow | 2026-10-06 | TBC
+| Using AI to help with writing code and consolidating good habits | Iryna Schlackow | 2026-10-06 | [Iryna's slides](https://ischlackow.github.io/presentations-2026-10-Using-AI-to-help-with-code-writing-PC-/#/title-slide)
 | Practical: AI-assisted data cleaning | Ru Jia | 2026-10-20 | TBC
