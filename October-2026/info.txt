@@ -1,0 +1,1 @@
+This folder contains two R Markdown documents (one without worked solutions and one with) used in the October 2026 practical on AI-assisted data cleaning.
