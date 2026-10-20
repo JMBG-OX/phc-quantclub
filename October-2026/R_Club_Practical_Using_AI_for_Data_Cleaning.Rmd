@@ -1,0 +1,487 @@
+---
+title: 'R Club Practical: Using AI for Data Cleaning'
+author: "Ru Jia"
+date: "2026-10-20"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+# Session Objective
+By the end of this session, you should be able to use AI to help diagnose messy quantitative data, translate cleaning rules into R code, and validate whether the resulting cleaning has worked.
+
+
+# Example dataset 
+
+First we're going to get the essential packages for this session, and set up the dataset we're using. We're using the example NHANES dataset, with randomly generated typos, missing values, and strange characters added (thanks to package 'messy'). 
+
+```{r set up example dataset}
+#install and library packages#
+packages <- c("tidyverse", "NHANES", "messy")
+
+for (pkg in packages) {
+  if (!require(pkg, character.only = TRUE)) {
+    install.packages(pkg)
+    library(pkg, character.only = TRUE)
+  }
+}
+
+##We're using the NHANES example dataset for this session#
+medical_data <- NHANES %>%
+  select(
+    ID,
+    Age,
+    Gender,
+    Height,
+    Weight,
+    BMI,
+    BPSysAve,
+    BPDiaAve,
+    Smoke100,
+    SmokeNow,
+    Diabetes,
+    PhysActive
+  )
+
+glimpse(medical_data)
+
+##the NHANES dataset is too clean, so we're going to make the data a bit more messy##
+##fist, we're going to make the Height and Weight data include different units##
+set.seed(1234)
+
+medical_data <- medical_data |>
+  mutate(
+    height_format = sample(
+      c("cm", "metres", "inches", "feet_inches"),
+      n(),
+      replace = TRUE,
+      prob = c(0.55, 0.15, 0.15, 0.15)
+    ),
+
+    Height_mixed = case_when(
+      height_format == "cm" ~ as.character(round(Height, 1)),
+      height_format == "metres" ~ as.character(round(Height / 100, 2)),
+      height_format == "inches" ~ paste0(round(Height / 2.54, 1), " in"),
+      height_format == "feet_inches" ~ {
+        total_inches <- round(Height / 2.54)
+        paste0(total_inches %/% 12, " ft ", total_inches %% 12, " in")
+      }
+    ),
+
+    weight_format = sample(
+      c("kg", "pounds", "stones_pounds"),
+      n(),
+      replace = TRUE,
+      prob = c(0.55, 0.20, 0.25)
+    ),
+
+    Weight_mixed = case_when(
+      weight_format == "kg" ~ as.character(round(Weight, 1)),
+      weight_format == "pounds" ~ paste0(round(Weight * 2.20462, 1), " lb"),
+      weight_format == "stones_pounds" ~ {
+        total_lb <- round(Weight * 2.20462)
+        paste0(total_lb %/% 14, " st ", total_lb %% 14, " lb")
+      }
+    )
+  )
+
+###DO NOT make any further changes to medical_data, this is the 'clean dataframe' that we can anchor##
+
+##second, we'll select the variables for the session datasframe##
+medical_data_messy <- medical_data |>
+  select(
+    ID,
+    Age,
+    Gender,
+    Height_mixed,
+    Weight_mixed,
+    BPSysAve,
+    BPDiaAve,
+    Smoke100,
+    SmokeNow,
+    Diabetes,
+    PhysActive
+  )
+
+##Third, we're going to add a bit more random mess to this data##
+set.seed(1234)
+
+medical_data_messy <- medical_data_messy |>
+  messy()
+
+##we will use medical_data_messy as the main working dataframe##
+
+```
+
+# What is in this dataset?
+
+The first thing to do with a new dataset/dataframe is always to check: what's in here, how many variables, what formats those variables are, what's in those variables, etc. Useful functions: names(), glimpse(). What do you find after running this code?
+
+```{r}
+
+names(medical_data_messy)
+
+glimpse(medical_data_messy)
+
+```
+# What responses actually exist?
+
+You might have noticed that some variables in this dataframe like Gender, Smoke100, SmokeNow, Diabetes, PhysActive are supposed to be categorical/binary, but now they are not. But it's not possible to convert these variables into Factor variables straightaway yet because the response texts are inconsistent. Run the codes below and inspect the results, how would you describe this problem to ChatGPT so it gives you the correct codes to clean this variable? 
+
+```{r}
+
+#medical_data_messy %>%
+#  count(Gender) #this one gives you a summary
+
+#unique(medical_data_messy$Gender) #this one lets you see all of the unique responses 
+
+#missing_gender <- medical_data_messy %>% count(is.na(medical_data_messy$Gender))
+
+```
+
+
+
+I usually construct my prompt with the following elements:
+* Describe the Data
+* Rules and expectations
+* Examples
+* Check
+
+
+In this case, I would write a prompt like this:
+I have a dataframe in R called 'medical_data_messy', each row is a participant. There is a variable in here called 'Gender', which is intended to contain two categories in this dataframe: Female and Male, but currently it's a character variable. The response texts in this variable is very messy and contain a lot of special characters, for example, !FEMALE, !Male, !f!eale, !f_emal(e. There are also missing values recorded as NA. Can you write me R code to clean this variable so that I can convert this variable into a Factor variable, keeping the NA as missing?
+
+Below is the code it gave me:
+
+```{r}
+
+medical_data_messy <- medical_data_messy %>%
+  mutate(
+    # Keep the original Gender variable for checking
+    Gender_original = Gender,
+    
+    # Standardise text:
+    # lowercase + remove everything except letters
+    Gender_clean = Gender %>%
+      str_to_lower() %>%
+      str_replace_all("[^a-z]", ""),
+    
+    # Classify gender
+    Gender = case_when(
+      Gender_clean %in% c("female", "f", "feale", "femal", "femail") ~ "Female",
+      Gender_clean %in% c("male", "m", "mal") ~ "Male",
+      TRUE ~ NA_character_
+    ),
+    
+    # Convert to factor
+    Gender = factor(Gender, levels = c("Female", "Male"))
+  )
+
+
+
+```
+
+**Question 1**: How do you check if the conversion codes worked?
+Hint: check missing values 
+
+
+**Question 2**: What if "f", "feale", "femal", "femail" are not the complete list of misspellings? 
+How do you prompt ChatGPT to help you inspect the variable before running case_when()? 
+
+
+**Lesson 1: Show AI examples of the mess before asking it how to clean the variable.**
+
+Now convert Smoke100, SmokeNow, Diabetes, PhysActive into Factor variables:
+Bonus point: Can you prompt ChatGPT to write you a function to clean these variables that have the exact same problem?
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+```
+
+**Lesson 2: Tell AI what the valid final values are, and what it should do when it is uncertain.**
+
+
+How about converting Age, BPSysAve, BPDiaAve into Numeric variables? 
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+
+# medical_data_messy <- medical_data_messy %>%
+#   mutate(
+#     Age_original = Age,
+#     BPSysAve_original = BPSysAve,
+#     BPDiaAve_original = BPDiaAve,
+#     
+#     Age = parse_number(Age),
+#     BPSysAve = parse_number(BPSysAve),
+#     BPDiaAve = parse_number(BPDiaAve)
+#   )
+
+```
+
+**Question**: when you run the codes above, it will give you Warining. See if you can make sense of the warning and decide whether to further prompt ChatGPT or not?
+
+
+
+
+# Find suspicious numeric values 
+
+Some values in BPSysAve, BPDiaAve don't look right. How do you prompt ChatGPT to help you identify suspicious values? And if there are values that are really off, how do you recode them as missing values from the dataframe for analysis? 
+
+Try something like this: I have two numeric variables in my dataframe: BPSysAve, BPDiaAve. I want to identify values that might be data-entry errors, not classify participants as having normal or abnormal blood pressure. Suggest broad plausibility checks for manual review, explain the assumptions, and write R code that flags rather than deletes observations.
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+```
+**Lesson 3: Ask AI to *flag* questionable data before asking it to change or delete them.**
+
+# Duplicates 
+
+There are duplicates in the dataframe. Can you prompt ChatGPT to write code to find them? Note that it's better to get the duplicates in a different dataframe and inspect them before removing them from the dataframe completely. 
+
+```{r}
+# medical_data_messy |>
+#   count(ID) |>
+#   filter(n > 1)
+# 
+# duplicated_IDs <- medical_data_messy |>
+#   group_by(ID) |>
+#   filter(n() > 1) |>
+#   ungroup() |>
+#   arrange(ID)
+# 
+# 
+# # Number of unique IDs that are duplicated
+# n_distinct(duplicated_IDs$ID) 
+# 
+# # Total number of rows involving duplicated IDs
+# nrow(duplicated_IDs)
+
+
+```
+
+## Removing duplicates
+There are different ways to deal with duplicated participants in a study. Sometimes we exclude every entry of them, sometimes we keep the first entry, or sometimes we follow certain rules about which entry we keep. Can you ask ChatGPT to help you remove the duplicates from the dataframe that you're using to do any analysis, but keep a record of the dataframe with duplicates?
+
+```{r}
+##Paste the code ChatGPT give you here##
+```
+
+
+### Optional Challenge - if you are comfortable with functions and grouped operations
+
+Sometimes, we want to apply more complicated rules. For example, here are the rules I'm applying to this dataframe: 
+We will check the values for all of these variables for duplicated IDs: "Age", "Gender", "BPSysAve", "BPDiaAve",
+  "Smoke100", "SmokeNow", "Diabetes", "PhysActive", and make the decision as follows:
+1. If identical records -> keep the first instance.
+2. Differences are only NA vs a value for duplicated IDs -> merge the records, taking the non-missing value.
+3. Genuine conflict (e.g., BPSysAve = 130 vs 145) -> keep the first instance and flag 'Duplicated ID - different responses' in a new column called 'Duplicate'.
+4. Non-duplicated IDs -> leave unchanged. 
+
+How would you prompt ChatGPT?
+
+Try something like this:
+
+In my dataframe, ID is the variable recording unique participant ID, each participant should only have one ID. However, there are duplicated values in ID in my dataframe. I want to resolve the duplicated according to a set of rules: 
+We will check the values for all of these variables for the duplicated ID: "Age", "Gender", "BPSysAve", "BPDiaAve",
+  "Smoke100", "SmokeNow", "Diabetes", "PhysActive", and make the decision as follows:
+1. If identical records -> keep the first instance.
+2. Differences are only NA vs a value for duplicated IDs -> merge the records, taking the non-missing value.
+3. Genuine conflict (e.g., BPSysAve = 130 vs 145) -> keep the first instance and flag 'Duplicated ID - different responses' in a new column called 'Duplicate'.
+4. Non-duplicated IDs -> leave unchanged. 
+I want the dataframe with duplicated IDs removed to be called medical_data_clean, and I also want a dataframe called medical_data_dup containing any IDs that were removed from medical_data_messy. Write R codes to achieve this. 
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+```
+**Lesson 4: AI can implement the rules, but you decide the rules.** 
+
+# Extra messy responses 
+## Fight the Boss: BMI
+
+You might have noticed that we've been ignoring two variables so far: Height_mixed, Weight_mixed. They look cursed. Now here is your task of the day: calculate BMI for all participants in this dataframe. 
+
+Think about what you need to achieve, what the obstacles are, and how to prompt your AI tool to help resolve them. We're going to break it down.
+
+### Round 1: What do we need?
+
+The first question is, what do we need to calculate BMI? 
+
+
+### Round 2: What is stopping us?
+
+What are the problems with the height and weight variables we have?
+
+Hint:
+1. Height_mixed and Weight_mixed are Character variables.
+2. Values in Height_mixed and Weight_mixed are messy, with special characters and inconsistent cases, for example: "66.7 i(n", "16&4.7& lb", "5 ft 5 i!n", "5 ft 5 i!n", "(7&6$.&6", "93.7", etc
+3. Height_mixed and Weight_mixed are recorded with different units. For example, cm, m, ft, in, kg, g, lb, st
+4. You'll probably need to break the task down to separate steps: (1) first clean the values in Height_mixed and Weight_mixed into numbers; (2) figure out the units for those values and create two columns for recording the units; (3) convert all of the values into height_cm and weight_kg as numeric variables; (4) calculate BMI based on height_cm and weight_kg
+
+### Round 3: Clean the values
+
+If you prompt ChatGPT like this:
+I need to calculate BMI for each ID based on their height and weight, which are recorded by Height_mixed and Weight_mixed as Character variables.
+Values in Height_mixed and Weight_mixed are messy, with special characters and inconsistent cases, for example: "66.7 i(n", "16&4.7& lb", "5 ft 5 i!n", "(7&6$.&6", "93.7", etc
+Write me R code to extract the clean text, with numbers and units, from Height_mixed into a new variable Height_clean, and from Weight_mixed into new variable Weight_clean 
+
+
+It will give you something like this chunk below. Run the first chunk:
+
+```{r}
+
+#step 1: clean the text
+
+# medical_data_clean <- medical_data_clean |>
+#   mutate(
+#     Height_clean = Height_mixed |>
+#       str_to_lower() |>
+#       str_replace_all("[^a-z0-9. ]", "") |>
+#       str_squish(),
+#     
+#     Weight_clean = Weight_mixed |>
+#       str_to_lower() |>
+#       str_replace_all("[^a-z0-9. ]", "") |>
+#       str_squish()
+#   )
+
+
+```
+
+If you run the code above, and then inspect the data, you will find that there are some values like this: 11 st 1.2 lb, 19 st 11 l.b, 10 st .3 lb, 6.9.6. This is because when removing special characters, we didn't include "." because it's also a decimal point. How do we deal with these values in the data? 
+
+Now try copying and pasting the codes back into chatGPT and describe this new issue, see what it will give you:
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+```
+The cleaning process is likely to be back and forth. Sometimes, you even need to manually change some of the values. But we can automate this as far as possible if there are identifiable patterns. 
+
+**Lesson 5: Break a difficult cleaning problem into smaller, testable steps.**
+
+
+### Round 4: Identify units and extract values
+
+Now we need to separate the units and the numbers so we can actually do the calculation for BMI. But remember, Height_clean and Weight_clean are recorded with different units. For example, cm, m, ft, in, kg, g, lb, st. How would you prompt ChatGPT?
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+
+```
+
+Run the code above, and then inspect the data, what do you find?
+
+You might find that there are missing values in the Height unit and Weight unit variables. How should we fix the problem?
+
+Try something like this:
+I ran the codes for identifying units above. Most of the units are identified, but there are missing values. If Height_clean or Weight_clean is not NA, then the missing value for Height_unit is likely cm or m, depending on the value in Height_clean, and the missing value for Weight_unit is likely kg or g, depending on the value in Weight_clean.
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+```
+
+After this process, you might find that there are some unusual height and weight values that need fixing. Try prompting ChatGPT "Some numbers don't look right in those variables. I need to inspect the Weight_number and Height_number with their units for each ID and Age."
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+```
+
+In the end, you might need to manually fix some values. The best way to do this is probably to identify the rows you want to fix, and manually enter the corrected value. You can still prompt ChatGPT to write the codes for you, describe the problem to it, and ask for codes to fix it. 
+
+**Note**: Because we're using a synthetic teaching dataset, we know some errors were deliberately introduced. In real research data, these cases should normally be flagged and checked against the original record rather than automatically corrected. 
+
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+
+```
+**Lesson 6: Code running without errors does not necessarily mean that the cleaning has worked correctly. Manual checks are always needed.** 
+
+
+### Round 5: Standardise units
+
+Now we just need to standardise the numbers and units for the BMI calculation. 
+Try this prompt: Now we have the units and numbers for height and weight, I want two new variables Height_cm and Weight_kg based on Height_number and Height_unit, Weight_number and Weight_unit.
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+```
+
+How to check if the values are correct? Here you can prompt ChatGPT: before calculating BMI, I want to inspect the ranges of Height_cm and Weight_kg
+
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+```
+### Round 6: Calculate BMI
+
+Try this prompt: Now I have Height_cm and Weight_kg, I want to calculate BMI as a new variable. 
+
+```{r}
+##Paste the code ChatGPT give you here##
+
+```
+
+**Question**: After creating BMI, how do you check if they look reasonable? Try to come up with three different ways to check the values of BMI.
+
+### Round 7: How close did we get?
+
+Now we'll use the original dataframe medical_data, which contains the original BMI data. Let's compare what we ended up with and the original. Can you get ChatGPT to write the code to add BMI from medical_data as a new variable BMI_original in medical_data_clean?
+
+```{r}
+
+# # Create a one-row-per-ID BMI lookup
+# bmi_lookup <- medical_data |>
+#   select(ID, BMI) |>
+#   mutate(ID = as.character(ID)) |>
+#   distinct(ID, .keep_all = TRUE) |>
+#   rename(BMI_original = BMI)
+# 
+# # Join original BMI onto the cleaned dataset
+# medical_data_clean <- medical_data_clean |>
+#   left_join(bmi_lookup, by = "ID")
+# 
+# # check differences 
+# medical_data_clean <- medical_data_clean %>% mutate (
+#  BMI_difference = BMI - BMI_original
+# )
+# 
+# medical_data_clean %>%
+#   arrange(desc(abs(BMI_difference))) %>%
+#   select(
+#     ID,
+#     BMI,
+#     BMI_original,
+#     BMI_difference,
+#     Height_mixed,
+#     Weight_mixed
+#   ) %>%
+#   head(20)
+
+```
+
+Inspect the BMI_difference. How close did we get? Which records are still wrong, and why?
+
+
+# Final summary
+The cleaning process using AI is going to be an iterative sequence of inspect → describe → prompt → run → inspect again → refine → validate. You might stay in the inspect → describe → prompt → run → inspect again loop for quite a while. 
+
+AI can help write the cleaning code, but you remain responsible for the cleaning rules and for checking the result.
+Useful prompt: “After writing the code, also give me checks I can run to confirm it worked and identify values the code could not classify confidently.”
+
