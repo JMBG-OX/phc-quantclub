@@ -4,5 +4,5 @@ We aim to organise Quant Club talks monthly. Each talk will be followed by a the
 
 | Session | Presenter | Date | Materials
 | :---         | :---           | :--- | :---
-| Using AI to help with writing code and consolidating good habits | Iryna Schlackow | 2026-10-06 | [Iryna's slides](https://ischlackow.github.io/presentations-2026-10-Using-AI-to-help-with-code-writing-PC-/#/title-slide)
-| Practical: AI-assisted data cleaning | Ru Jia | 2026-10-20 | [R Markdown demo file](https://github.com/JMBG-OX/phc-quantclub/blob/77b818edbadbaf79b5e731c26f887d0cfd854704/R%20Club%20Practical_Using%20AI%20for%20Data%20Cleaning.Rmd)
+| Using AI for writing code and consolidating good habits | Iryna Schlackow | 2026-10-06 | [Iryna's slides](https://ischlackow.github.io/presentations-2026-10-Using-AI-to-help-with-code-writing-PC-/#/title-slide)
+| Practical: AI-assisted data cleaning | Ru Jia | 2026-10-20 | [R Markdown demo file](October-2026/R_Club_Practical_Using_AI_for_Data_Cleaning.Rmd) <br/> [Demo file with worked solutions](October-2026/Using_AI_for_Data_Cleaning_UPDATED_FULL_BACK.Rmd)
